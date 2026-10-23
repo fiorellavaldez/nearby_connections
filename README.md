@@ -100,6 +100,18 @@ await Permission.bluetooth.serviceStatus.isEnabled;
 await Permission.nearbyWifiDevices.request()
 ```
 
+### Background services
+
+The Android plugin uses the application's `Context` rather than requiring an
+`Activity` for Nearby Connections operations. This allows those operations to be
+called from a Flutter engine running without an attached activity, such as an
+engine used by a background service, provided the plugin is registered with
+that engine.
+
+This does not start or keep a service alive. Request runtime permissions while
+the app has an activity available, and follow Android's foreground-service and
+background-execution requirements for your app.
+
 Checkout the [**Example**](https://github.com/mannprerak2/nearby_connections/tree/master/example) in Repository for more details.
 
 ## NOTE

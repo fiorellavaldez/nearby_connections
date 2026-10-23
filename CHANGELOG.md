@@ -1,3 +1,8 @@
+## Unreleased
+
+- Use the Android application context instead of requiring an attached activity,
+  allowing Nearby Connections operations from background Flutter engines.
+
 ## 4.3.0
 
 - Remove legacy plugin dependencies for new flutter version

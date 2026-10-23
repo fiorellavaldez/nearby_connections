@@ -1,6 +1,6 @@
 package com.pkmnapps.nearby_connections;
 
-import android.app.Activity;
+import android.content.Context;
 import android.util.Log;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
@@ -34,8 +34,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
-import io.flutter.embedding.engine.plugins.activity.ActivityAware;
-import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
@@ -45,15 +43,12 @@ import io.flutter.plugin.common.EventChannel;
 /**
  * NearbyConnectionsPlugin
  */
-public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin, ActivityAware {
-	private Activity activity;
+public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin {
+	private Context context;
 	private static final String SERVICE_ID = "com.pkmnapps.nearby_connections";
-	private static MethodChannel channel;
-	private static EventChannel eventChannel;
-	private static EventChannel.EventSink eventSink;
-	private NearbyConnectionsPlugin(Activity activity) {
-		this.activity = activity;
-	}
+	private MethodChannel channel;
+	private EventChannel eventChannel;
+	private EventChannel.EventSink eventSink;
 
 	public NearbyConnectionsPlugin() {
 	}
@@ -70,10 +65,10 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 				try {
 					// Copy the file to a new location.
 					Uri uri = Uri.parse(sourceUri);
-					InputStream in = activity.getContentResolver().openInputStream(uri);
+					InputStream in = context.getContentResolver().openInputStream(uri);
 					copyStream(in, new FileOutputStream(new File(destinationFilepath)));
 					// Delete the original file.
-					activity.getContentResolver().delete(uri, null, null);
+					context.getContentResolver().delete(uri, null, null);
 					result.success(true);
 				} catch (IOException e) {
 					// Log the error.
@@ -83,12 +78,12 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 				break;
 			case "stopAdvertising":
 				Log.d("nearby_connections", "stopAdvertising");
-				Nearby.getConnectionsClient(activity).stopAdvertising();
+				Nearby.getConnectionsClient(context).stopAdvertising();
 				result.success(null);
 				break;
 			case "stopDiscovery":
 				Log.d("nearby_connections", "stopDiscovery");
-				Nearby.getConnectionsClient(activity).stopDiscovery();
+				Nearby.getConnectionsClient(context).stopDiscovery();
 				result.success(null);
 				break;
 			case "startAdvertising": {
@@ -103,7 +98,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 				AdvertisingOptions advertisingOptions = new AdvertisingOptions.Builder()
 						.setStrategy(getStrategy(strategy)).build();
 
-				Nearby.getConnectionsClient(activity).startAdvertising(userNickName, serviceId,
+				Nearby.getConnectionsClient(context).startAdvertising(userNickName, serviceId,
 								advertConnectionLifecycleCallback, advertisingOptions)
 						.addOnSuccessListener(new OnSuccessListener<Void>() {
 							@Override
@@ -130,7 +125,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 
 				DiscoveryOptions discoveryOptions = new DiscoveryOptions.Builder().setStrategy(getStrategy(strategy))
 						.build();
-				Nearby.getConnectionsClient(activity)
+				Nearby.getConnectionsClient(context)
 						.startDiscovery(serviceId, endpointDiscoveryCallback, discoveryOptions)
 						.addOnSuccessListener(new OnSuccessListener<Void>() {
 							@Override
@@ -148,14 +143,14 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 			}
 			case "stopAllEndpoints":
 				Log.d("nearby_connections", "stopAllEndpoints");
-				Nearby.getConnectionsClient(activity).stopAllEndpoints();
+				Nearby.getConnectionsClient(context).stopAllEndpoints();
 				result.success(null);
 				break;
 			case "disconnectFromEndpoint": {
 				Log.d("nearby_connections", "disconnectFromEndpoint");
 				String endpointId = call.argument("endpointId");
 				assert endpointId != null;
-				Nearby.getConnectionsClient(activity).disconnectFromEndpoint(endpointId);
+				Nearby.getConnectionsClient(context).disconnectFromEndpoint(endpointId);
 				result.success(null);
 				break;
 			}
@@ -166,7 +161,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 
 				assert userNickName != null;
 				assert endpointId != null;
-				Nearby.getConnectionsClient(activity)
+				Nearby.getConnectionsClient(context)
 						.requestConnection(userNickName, endpointId, discoverConnectionLifecycleCallback)
 						.addOnSuccessListener(new OnSuccessListener<Void>() {
 							@Override
@@ -185,7 +180,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 				String endpointId = (String) call.argument("endpointId");
 
 				assert endpointId != null;
-				Nearby.getConnectionsClient(activity).acceptConnection(endpointId, payloadCallback)
+				Nearby.getConnectionsClient(context).acceptConnection(endpointId, payloadCallback)
 						.addOnSuccessListener(new OnSuccessListener<Void>() {
 							@Override
 							public void onSuccess(Void aVoid) {
@@ -204,7 +199,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 				String endpointId = (String) call.argument("endpointId");
 
 				assert endpointId != null;
-				Nearby.getConnectionsClient(activity).rejectConnection(endpointId)
+				Nearby.getConnectionsClient(context).rejectConnection(endpointId)
 						.addOnSuccessListener(new OnSuccessListener<Void>() {
 							@Override
 							public void onSuccess(Void aVoid) {
@@ -225,7 +220,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 
 				assert endpointId != null;
 				assert bytes != null;
-				Nearby.getConnectionsClient(activity).sendPayload(endpointId, Payload.fromBytes(bytes));
+				Nearby.getConnectionsClient(context).sendPayload(endpointId, Payload.fromBytes(bytes));
 				Log.d("nearby_connections", "sentPayload");
 				result.success(true);
 				break;
@@ -241,7 +236,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 					File file = new File(filePath);
 
 					Payload filePayload = Payload.fromFile(file);
-					Nearby.getConnectionsClient(activity).sendPayload(endpointId, filePayload);
+					Nearby.getConnectionsClient(context).sendPayload(endpointId, filePayload);
 					Log.d("nearby_connections", "sentFilePayload");
 					result.success(filePayload.getId()); // return payload id to dart
 				} catch (FileNotFoundException e) {
@@ -254,7 +249,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 			case "cancelPayload": {
 				String payloadId = (String) call.argument("payloadId");
 				assert payloadId != null;
-				Nearby.getConnectionsClient(activity).cancelPayload(Long.parseLong(payloadId));
+				Nearby.getConnectionsClient(context).cancelPayload(Long.parseLong(payloadId));
 				Log.d("nearby_connections", "cancelPayload");
 				result.success(null);
 				break;
@@ -453,6 +448,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 
 	@Override
 	public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
+		context = binding.getApplicationContext();
 		channel = new MethodChannel(binding.getBinaryMessenger(), "nearby_connections");
 		channel.setMethodCallHandler(this);
 		eventChannel=new EventChannel(binding.getBinaryMessenger(), "nearby_connections/events");
@@ -471,24 +467,10 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 
 	@Override
 	public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
-	}
-
-	@Override
-	public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
-		this.activity = binding.getActivity();
-	}
-
-	@Override
-	public void onDetachedFromActivity() {
-	}
-
-	@Override
-	public void onDetachedFromActivityForConfigChanges() {
-	}
-
-	@Override
-	public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding binding) {
-		this.activity = binding.getActivity();
+		channel.setMethodCallHandler(null);
+		eventChannel.setStreamHandler(null);
+		eventSink = null;
+		context = null;
 	}
 
 	/** Copies a stream from one location to another. */
