@@ -45,12 +45,21 @@ import io.flutter.plugin.common.EventChannel;
  */
 public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin {
 	private Context context;
+	private static final String TAG = "NearbyConnectionsPlugin";
 	private static final String SERVICE_ID = "com.pkmnapps.nearby_connections";
 	private MethodChannel channel;
 	private EventChannel eventChannel;
 	private EventChannel.EventSink eventSink;
 
 	public NearbyConnectionsPlugin() {
+	}
+
+	private synchronized void emitEvent(Map<String, Object> args) {
+		if (eventSink == null) {
+			Log.w(TAG, "Dropping Nearby event after EventChannel cancellation or engine detach");
+			return;
+		}
+		eventSink.success(args);
 	}
 
 	@Override
@@ -77,12 +86,12 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 				}
 				break;
 			case "stopAdvertising":
-				Log.d("nearby_connections", "stopAdvertising");
+				Log.d("nearby_connections", "stopAdvertising requested");
 				Nearby.getConnectionsClient(context).stopAdvertising();
 				result.success(null);
 				break;
 			case "stopDiscovery":
-				Log.d("nearby_connections", "stopDiscovery");
+				Log.d("nearby_connections", "stopDiscovery requested");
 				Nearby.getConnectionsClient(context).stopDiscovery();
 				result.success(null);
 				break;
@@ -142,7 +151,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 				break;
 			}
 			case "stopAllEndpoints":
-				Log.d("nearby_connections", "stopAllEndpoints");
+				Log.d("nearby_connections", "stopAllEndpoints requested");
 				Nearby.getConnectionsClient(context).stopAllEndpoints();
 				result.success(null);
 				break;
@@ -270,7 +279,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 			args.put("isIncomingConnection", connectionInfo.isIncomingConnection());
 
 			args.put("method", "ad.onConnectionInitiated");
-			eventSink.success(args);
+			emitEvent(args);
 		}
 
 		@Override
@@ -297,7 +306,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 			}
 			args.put("statusCode", statusCode);
 			args.put("method", "ad.onConnectionResult");
-			eventSink.success(args);
+			emitEvent(args);
 		}
 
 		@Override
@@ -307,7 +316,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 			args.put("endpointId", endpointId);
 
 			args.put("method", "ad.onDisconnected");
-			eventSink.success(args);
+			emitEvent(args);
 		}
 	};
 
@@ -322,7 +331,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 			args.put("isIncomingConnection", connectionInfo.isIncomingConnection());
 
 			args.put("method", "dis.onConnectionInitiated");
-			eventSink.success(args);
+			emitEvent(args);
 		}
 
 		@Override
@@ -350,7 +359,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 			args.put("statusCode", statusCode);
 
 			args.put("method", "dis.onConnectionResult");
-			eventSink.success(args);
+			emitEvent(args);
 		}
 
 		@Override
@@ -360,7 +369,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 			args.put("endpointId", endpointId);
 
 			args.put("method","dis.onDisconnected");
-			eventSink.success(args);
+			emitEvent(args);
 		}
 	};
 
@@ -387,7 +396,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 
 
 			args.put("method","onPayloadReceived");
-			eventSink.success(args);
+			emitEvent(args);
 		}
 
 		@Override
@@ -404,7 +413,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 			args.put("totalBytes", payloadTransferUpdate.getTotalBytes());
 
 			args.put("method","onPayloadTransferUpdate");
-			eventSink.success(args);
+			emitEvent(args);
 		}
 	};
 
@@ -419,7 +428,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 			args.put("serviceId", discoveredEndpointInfo.getServiceId());
 
 			args.put("method","dis.onEndpointFound");
-			eventSink.success(args);
+			emitEvent(args);
 		}
 
 		@Override
@@ -429,7 +438,7 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 			args.put("endpointId", endpointId);
 
 			args.put("method","dis.onEndpointLost");
-			eventSink.success(args);
+			emitEvent(args);
 		}
 	};
 
@@ -456,17 +465,21 @@ public class NearbyConnectionsPlugin implements MethodCallHandler, FlutterPlugin
 				new EventChannel.StreamHandler() {
 					@Override
 					public void onListen(Object arguments, EventChannel.EventSink events) {
-						eventSink=events;
+						synchronized (NearbyConnectionsPlugin.this) {
+							eventSink = events;
+						}
 					}
 					@Override
 					public void onCancel(Object arguments) {
-						eventSink=null;
+						synchronized (NearbyConnectionsPlugin.this) {
+							eventSink = null;
+						}
 					}
 				});
 	}
 
 	@Override
-	public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
+	public synchronized void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
 		channel.setMethodCallHandler(null);
 		eventChannel.setStreamHandler(null);
 		eventSink = null;
